@@ -11,7 +11,7 @@
   "license": "MIT",
   "dependencies": {
     "basic-chain": "github:lolotrgeek/Chain",
-    "table": "^6.8.0",
-    "zyre.js": "^1.2.2"
+    "basic-messaging": "^1.3.1",
+    "table": "^6.8.0"
   }
 }

@@ -1,6 +1,6 @@
 const { randomUUID } = require('crypto')
 const { Child } = require("./child")
-const { Node } = require("./node")
+const { Node } = require("basic-messaging")
 const { Chain } = require("basic-chain")
 const { decode, encode, log } = require("./helpers")
 
@@ -27,11 +27,11 @@ class Oscillate {
     }
 
     buildState() {
-        try { return encode({ chain_id: this.chain.id, state: this.state, location: this.location, direction: this.direction }) } catch (error) { log(`buildState ${error}`) }
+        try { return encode({ chain_id: this.chain.id, state: this.state, location: this.location, direction: this.direction, name: this.name }) } catch (error) { log(`buildState ${error}`) }
     }
 
     sendState(to) {
-        try { setTimeout(() => this.node.send(to, this.buildState()), 1000) } catch (error) { log(`sendState ${error}`) }
+        try { setTimeout(() => this.node.send(to, {state: this.buildState(), from: this.name}), 1000) } catch (error) { log(`sendState ${error}`) }
     }
 
     sayState(state, name) {
@@ -152,15 +152,15 @@ class Oscillate {
     }
 
     stateCondition(data, name) {
-        return this.location && this.position && data && name && data.chain_id === this.chain.id && data.state
+        return this.location && this.position && data && name && data.chain_id === this.chain.id && data.state && data.name
     }
 
-    State(data, name) {
+    State(data) {
         try {
             this.location = this.getLocation(this.name)
             this.position = this.getPosition(this.location)
-            if (this.stateCondition(data, name)) {
-                this.sender_location = this.getLocation(name)
+            if (this.stateCondition(data)) {
+                this.sender_location = this.getLocation(data.name)
                 this.setState(data)
                 if (typeof this.recpient === 'string') this.sendState(this.recpient)
                 log(`LOCATION ${this.location} | ${this.position} | ${this.name} | state ${this.state} [${this.direction}] --> ${this.recpient}`)
@@ -171,15 +171,15 @@ class Oscillate {
         }
     }
 
-    listener(message, name) {
+    listener(message) {
         try {
             let data = decode(message)
             if (this.chain.isValid(data)) {
                 this.chain.merge(data)
                 if (this.debug === 'chain') log(this.chain ? `Merged ${this.chain}` : "broken chain...")
             }
-            else if (this.isState(data)) this.State(data, name)
-            else this.node.send(name, encode(this.chain))
+            else if (this.isState(data)) this.State(data)
+            else this.node.send(data.name, encode(this.chain))
         }
         catch (error) {
             log(`listener: ${error}`)
@@ -203,9 +203,10 @@ class Oscillate {
 
     run() {
         try {
-            this.node.listen(this.name, (message, name) => this.listener(message, name))
-            this.node.core.on("connect", (id, name) => this.update(name))
-            this.State(decode(this.buildState()), "")
+            this.node.send("connect", this.name)
+            this.node.listen(this.name, this.listener)
+            this.node.listen("connect", this.update)
+            this.State(decode(this.buildState()))
         } catch (error) {
             log(`run: ${error}`)
         }
