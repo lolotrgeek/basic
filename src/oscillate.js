@@ -1,5 +1,4 @@
 const { randomUUID } = require('crypto')
-const { Child } = require("./child")
 const { Node } = require("basic-messaging")
 const { Chain } = require("basic-chain")
 const { decode, encode } = require("./helpers")
