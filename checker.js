@@ -1,20 +1,7 @@
-const { Node } = require("./src/node")
+const { Node } = require("basic-messaging")
 const node = new Node("checker")
-
-console.log(node.core._name)
 
 let peers = []
 
-setInterval(() => {
-    let new_peers = Object.values(node.core.getPeers()).filter(peer => peer.name)
-    if(new_peers.length > peers) {
-        console.log(new_peers)
-        node.core.removeAllListeners()
-        // todo: filter non node messages?
-        // if(isNaN(parseInt(from)) === false)
-        node.listen("*", (message, from) => console.log(`Heard: ${message}, From: ${from}`))
-        peers = new_peers
-    }
-}, 2000)
-
-
+// node.listen("*", console.log)
+node.listen("*", message => typeof message === 'object' && message.state ? console.log(message) : console.log('update'))
