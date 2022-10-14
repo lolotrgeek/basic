@@ -1,3 +1,3 @@
-const { spawn_node } = require("./src/process")
-
-module.exports = { spawn_node }
+const {Spawner} = require('process-spawn')
+const spawner = new Spawner()
+spawner.spawn_node("./src/runner.js", 5)
