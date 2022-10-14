@@ -1,3 +1,5 @@
-const {Spawner} = require('process-spawn')
-const spawner = new Spawner()
-spawner.spawn_node("../../src/oscillate.js", 5)
+const { Oscillate } = require("../src/oscillate");
+
+const oscillate = new Oscillate()
+
+oscillate.run()

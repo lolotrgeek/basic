@@ -20,7 +20,7 @@ class Oscillate {
             this.spinner = spin => setInterval(spin, this.interval)
             this.isState = data => typeof data === "object" && data.state && !isNaN(data.state) && typeof data.chain_id === 'string'
             this.invert_state = state => state === 0 ? 1 : 0
-            this.log = message => process.send ? process.send(message) : console.log(message)
+            this.log = console.log
         } catch (error) {
             this.log(`constructor: ${error}`)
         }
@@ -31,7 +31,7 @@ class Oscillate {
     }
 
     sendState(to) {
-        try { setTimeout(() => this.node.send(to, {state: this.buildState(), from: this.name}), 1000) } catch (error) { this.log(`sendState ${error}`) }
+        try { setTimeout(() => this.node.send(to, this.buildState()), 1000) } catch (error) { this.log(`sendState ${error}`) }
     }
 
     sayState(state, name) {
@@ -97,8 +97,14 @@ class Oscillate {
      */
     getLocation(name) {
         try {
+            this.log("Finding Location...", name)
             let location = this.chain.blocks.findIndex(block => block.data === name)
-            return location > -1 ? location : null
+            if (location === -1) {
+                this.log("Unable to find", name)
+                return false
+            }
+            this.log("Found Location: ", location)
+            return location
         } catch (error) { this.log(`getLocation: ${error}`) }
     }
 
@@ -120,6 +126,7 @@ class Oscillate {
 
     setState(data) {
         try {
+            this.log("Setting State")
             if (this.position === 'first') {
                 // this.log(`${this.name} | I'm first.`)
                 this.state = this.invert_state(this.state)
@@ -137,7 +144,7 @@ class Oscillate {
                     this.recpient = this.selectNeighborAbove(this.location)
                     this.direction = 'up'
                 }
-                
+
             }
 
             if (this.position === 'last') {
@@ -151,21 +158,29 @@ class Oscillate {
         }
     }
 
-    stateCondition(data, name) {
-        return this.location && this.position && data && name && data.chain_id === this.chain.id && data.state && data.name
+    stateCondition(data) {
+        if(!this.location) return false
+        if(!this.position) return false
+        if(typeof data !== 'object') { this.log("stateCondition: Data is not object"); return false}
+        if(data.chain_id !== this.chain.id) { this.log("stateCondition: Chain mis-match!"); return false}
+        if(!data.state) { this.log("stateCondition: No state."); return false}
+        if(!data.name) { this.log("stateCondition: No name."); return false}
+        else return true
     }
 
     State(data) {
         try {
             this.location = this.getLocation(this.name)
             this.position = this.getPosition(this.location)
+            this.log("Running State", this.location, this.position)
             if (this.stateCondition(data)) {
                 this.sender_location = this.getLocation(data.name)
+                this.log("isState from:", this.sender_location)
                 this.setState(data)
                 if (typeof this.recpient === 'string') this.sendState(this.recpient)
                 this.log(`LOCATION ${this.location} | ${this.position} | ${this.name} | state ${this.state} [${this.direction}] --> ${this.recpient}`)
             }
-            
+
         } catch (error) {
             this.log(`state: ${error}`)
         }
@@ -173,13 +188,17 @@ class Oscillate {
 
     listener(message) {
         try {
+            this.log(message)
+            if (this.isPeer(message)) this.update(message.advertisement.name)
             let data = decode(message)
-            if (this.chain.isValid(data)) {
-                this.chain.merge(data)
-                if (this.debug === 'chain') this.log(this.chain ? `Merged ${this.chain}` : "broken chain...")
+            this.log(data)
+            if (data.chain && this.chain.isValid(data.chain)) {
+                this.chain.merge(data.chain)
+                this.log(this.chain ? `Merged ${this.chain}` : "broken chain...")
+                this.State(decode(this.buildState()))
             }
             else if (this.isState(data)) this.State(data)
-            else this.node.send(data.name, encode(this.chain))
+            else this.node.send(data.name, encode({chain: this.chain, name: this.name}))
         }
         catch (error) {
             this.log(`listener: ${error}`)
@@ -190,22 +209,31 @@ class Oscillate {
      * Adds a block to the local chain with the block data being the given node's name
      * @param {string} name is from node.core, and defined as `this.name` but to invoke peers this method allows for passing a `name`
      */
-     update(name) {
+    update(name) {
         try {
             if (this.isNameValid(name)) {
                 this.chain.put(name)
-                this.node.send(name, encode(this.chain))
+                console.log(name)
+                this.node.send(name, encode({chain: this.chain, name: this.name}))
             }
         } catch (error) {
             this.log(`update: ${error}`)
         }
     }
 
+    isPeer(message) {
+        try {
+            return typeof message === 'object' && typeof message.id === 'string' && message.address && message.advertisement.name
+        } catch (error) {
+            this.log(`isPeer: ${error}`)
+        }
+    }
+
     run() {
         try {
-            this.node.send("connect", this.name)
-            this.node.listen(this.name, this.listener)
-            this.node.listen("connect", this.update)
+            this.log("alive " + this.name)
+            this.node.listen("*", message => this.listener(message))
+
             this.State(decode(this.buildState()))
         } catch (error) {
             this.log(`run: ${error}`)
@@ -217,8 +245,7 @@ class Oscillate {
             try { this.log(this.chain.blocks.length) }
             catch (error) { this.log(`test: ${error}`) }
         }, 5000)
-    }    
+    }
 }
 
-const oscillate = new Oscillate()
-oscillate.run()
+module.exports = { Oscillate }

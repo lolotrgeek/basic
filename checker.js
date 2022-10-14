@@ -4,4 +4,5 @@ const node = new Node("checker")
 let peers = []
 
 // node.listen("*", console.log)
-node.listen("*", message => typeof message === 'object' && message.state ? console.log(message) : console.log('update'))
+// node.listen("logs", message => typeof message === 'object' && message.state ? console.log(message) : console.log('update'))
+node.listen("*", console.log)
